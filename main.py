@@ -5,6 +5,31 @@ from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import logging
 import asyncio
+import yaml
+
+
+class Config:
+    def __init__(self):
+        self.config = yaml.load(open('config.yaml'), Loader=yaml.Loader)
+        self.config_location = 'config.yaml'
+
+    def last_news(self):
+        result = self.config['last_news']
+        return result
+
+    def write_header(self, header):
+        config = self.config
+        header_decoded = header.encode('utf-8').decode('utf-8')
+        config['last_news']=header_decoded
+
+        try:
+            with open(self.config_location, 'w') as file:
+                yaml.dump(config, stream=file, default_flow_style=False, sort_keys=False, allow_unicode=True)
+        except OSError:
+            return False
+    def get_config_value(self, value):
+        result = self.config['config'][str(value)]
+        return result
 
 
 class LadaOnline:
@@ -37,37 +62,41 @@ class LadaOnline:
         return (result)
 
 
-
-bot = Bot(token='1665950041:AAGBfPUmXZXShhG8vY7_NmtVi4m6eCyU-J0')
+# Test bot token 1558121095:AAHO71rediKKdjqPe9jsveSmrkEfPMJBLW8
+# Prod bot token 1665950041:AAGBfPUmXZXShhG8vY7_NmtVi4m6eCyU-J0
+t = Config()
+token = t.get_config_value('token')
+bot = Bot(token=token)
 dp = Dispatcher(bot)
-#logging.basicConfig(level=logging.DEBUG)
+
+
+# logging.basicConfig(level=logging.DEBUG)
 
 
 async def checknews():
     c = LadaOnline()
     title = c.headers()
-    last_news = open("/opt/lada_online_bot/last_news.txt", "r")
-    last_wrote_title = last_news.read()
-    last_news.close()
+    conf = Config()
+    last_wrote_title = conf.last_news()
+    chat_id = conf.get_config_value('chat_id')
     if title == last_wrote_title:
         pass
     else:
         msg = r'*Новость c сайта лада.онлайн*' + '\n' + '*' + c.headers() + '*' + '\n' + c.content()
         inline_btn_1 = InlineKeyboardButton('Подробнее', c.news_url())
         inline_kb1 = InlineKeyboardMarkup().add(inline_btn_1)
-        #1001365037048
-        await bot.send_photo('-1001365037048', types.InputFile.from_url(c.image()), msg, parse_mode="MARKDOWN",
+        # 1001365037048
+        await bot.send_photo(chat_id, types.InputFile.from_url(c.image()), msg, parse_mode="MARKDOWN",
+                             # TODO chat ID must be readed from config
                              reply_markup=inline_kb1)
-        last_news = open("/opt/lada_online_bot/last_news.txt", "w")
-        last_news.write(title)
-        last_news.close()
+        conf.write_header(title)
+
 
 
 async def scheduled(wait_for):
     while True:
         await asyncio.sleep(wait_for)
         await checknews()
-
 
 
 @dp.message_handler(commands=['start'])
@@ -96,12 +125,12 @@ async def send_welcome(message: types.Message):
     msg = r'*Новость c сайта лада.онлайн*' + '\n' + '*' + c.headers() + '*' + '\n' + c.content()
     inline_btn_1 = InlineKeyboardButton('Подробнее', c.news_url())
     inline_kb1 = InlineKeyboardMarkup().add(inline_btn_1)
-    #'250484890'
+    # '250484890'
     await bot.send_photo(message.from_user.id, types.InputFile.from_url(c.image()), msg, parse_mode="MARKDOWN",
                          reply_markup=inline_kb1)
 
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
-    loop.create_task(scheduled(1800))
+    loop.create_task(scheduled(5))
     executor.start_polling(dp, skip_updates=True)

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-#BASEDIR=$(dirname "$0")
-BASEDIR=/opt/lada_online_bot
+BASEDIR=$(dirname "$0")
+#BASEDIR=$(pwd)
 echo "Executing App in '$BASEDIR'"
 
 source $BASEDIR/venv/bin/activate
