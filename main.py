@@ -87,7 +87,6 @@ async def checknews():
         inline_kb1 = InlineKeyboardMarkup().add(inline_btn_1)
         # 1001365037048
         await bot.send_photo(chat_id, types.InputFile.from_url(c.image()), msg, parse_mode="MARKDOWN",
-                             # TODO chat ID must be readed from config
                              reply_markup=inline_kb1)
         conf.write_header(title)
 
