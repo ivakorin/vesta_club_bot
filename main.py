@@ -6,6 +6,26 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import logging
 import asyncio
 import yaml
+import sqlite3
+
+
+class DB:
+    def __init__(self):
+        self.connect = sqlite3.connect('data.db')
+        self.cursor = self.connect.cursor()
+
+    def install_tables(self):
+        self.cursor.execute('CREATE TABLE IF NOT EXISTS data(id INT PRIMARY KEY DEFAULT 1, last_news TEXT);')
+        self.connect.commit()
+
+    def update_data(self, column, data):
+        self.cursor.execute('INSERT OR REPLACE INTO data(id, ' + column + ') VALUES(1, "' + data + '");')
+        self.connect.commit()
+
+    def read_data(self, data):
+        self.cursor.execute('SELECT ' + data + ' FROM data WHERE id=1;')
+        result = self.cursor.fetchone()
+        return result[0]
 
 
 class Config:
@@ -13,20 +33,6 @@ class Config:
         self.config = yaml.load(open('config.yaml'), Loader=yaml.Loader)
         self.config_location = 'config.yaml'
 
-    def last_news(self):
-        result = self.config['last_news']
-        return result
-
-    def write_header(self, header):
-        config = self.config
-        header_decoded = header.encode('utf-8').decode('utf-8')
-        config['last_news']=header_decoded
-
-        try:
-            with open(self.config_location, 'w') as file:
-                yaml.dump(config, stream=file, default_flow_style=False, sort_keys=False, allow_unicode=True)
-        except OSError:
-            return False
     def get_config_value(self, value):
         result = self.config['config'][str(value)]
         return result
@@ -42,24 +48,24 @@ class LadaOnline:
 
     def headers(self):
         result = self.news.find('h3').text
-        return (result)
+        return result
 
     def content(self):
         c = self.news.find_all('td')
         result = c[1].text.replace('Подробнее', '')
-        return (result)
+        return result
 
     def image(self):
         images = self.news.find_all('img')
         image_src = images[0]['src']
         s = image_src[image_src.find("=") + 1:]
         result = '&w'.join(s.split('&w')[:-1])
-        return (result)
+        return result
 
     def news_url(self):
         news_url = self.news.find_all('a')
         result = news_url[0]['href']
-        return (result)
+        return result
 
 
 # Test bot token 1558121095:AAHO71rediKKdjqPe9jsveSmrkEfPMJBLW8
@@ -77,8 +83,9 @@ async def checknews():
     c = LadaOnline()
     title = c.headers()
     conf = Config()
-    last_wrote_title = conf.last_news()
+    data = DB()
     chat_id = conf.get_config_value('chat_id')
+    last_wrote_title = data.read_data('last_news')
     if title == last_wrote_title:
         pass
     else:
@@ -88,8 +95,7 @@ async def checknews():
         # 1001365037048
         await bot.send_photo(chat_id, types.InputFile.from_url(c.image()), msg, parse_mode="MARKDOWN",
                              reply_markup=inline_kb1)
-        conf.write_header(title)
-
+        data.update_data('last_news', title)
 
 
 async def scheduled(wait_for):
@@ -104,7 +110,8 @@ async def send_welcome(message: types.Message):
     This handler will be called when user sends `/start` or `/help` command
     """
     await message.reply(
-        "Привет! Этот бот рассылает уведомления о новостях с сайта лада.онлайн. Для более подробной информации используйте опцию /help")
+        "Привет! Этот бот рассылает уведомления о новостях с сайта лада.онлайн. Для более подробной информации "
+        "используйте опцию /help")
 
 
 @dp.message_handler(commands=['help'])
@@ -130,6 +137,8 @@ async def send_welcome(message: types.Message):
 
 
 if __name__ == '__main__':
+    db = DB()
+    db.install_tables()
     loop = asyncio.get_event_loop()
-    loop.create_task(scheduled(5))
+    loop.create_task(scheduled(1800))
     executor.start_polling(dp, skip_updates=True)
