@@ -39,10 +39,10 @@ class Config:
 
 
 class LadaOnline:
-    def __init__(self, host="https://лада.онлайн/", url="https://лада.онлайн/auto-news/lada-vesta-news/"):
+    def __init__(self, host="https://лада.онлайн/", url="auto-news/lada-vesta-news/"):
         self.host = host
         self.url = url
-        self.response = requests.get(url)
+        self.response = requests.get(host+url)
         self.soup = BeautifulSoup(self.response.text, 'lxml')
         self.news = self.soup.find(id="dle-content")
 
@@ -86,9 +86,7 @@ async def checknews():
     data = DB()
     chat_id = conf.get_config_value('chat_id')
     last_wrote_title = data.read_data('last_news')
-    if title == last_wrote_title:
-        pass
-    else:
+    if title != last_wrote_title:
         msg = r'*Новость c сайта лада.онлайн*' + '\n' + '*' + c.headers() + '*' + '\n' + c.content()
         inline_btn_1 = InlineKeyboardButton('Подробнее', c.news_url())
         inline_kb1 = InlineKeyboardMarkup().add(inline_btn_1)
