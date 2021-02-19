@@ -1,31 +1,36 @@
 #!/usr/bin/env python
+import asyncio
+import sqlite3
+
 import requests
-from bs4 import BeautifulSoup
+import yaml
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-import logging
-import asyncio
-import yaml
-import sqlite3
+from bs4 import BeautifulSoup
 
 
 class DB:
-    def __init__(self):
-        self.connect = sqlite3.connect('data.db')
+    def __init__(self, db_name='data.db'):
+        self.connect = sqlite3.connect(db_name)
         self.cursor = self.connect.cursor()
 
     def install_tables(self):
-        self.cursor.execute('CREATE TABLE IF NOT EXISTS data(id INT PRIMARY KEY DEFAULT 1, last_news TEXT);')
+        self.cursor.execute('CREATE TABLE IF NOT EXISTS data(id INT PRIMARY KEY DEFAULT 1, last_news TEXT, content '
+                            'TEXT, url TEXT);')
         self.connect.commit()
 
-    def update_data(self, column, data):
-        self.cursor.execute('INSERT OR REPLACE INTO data(id, ' + column + ') VALUES(1, "' + data + '");')
+    def update_data(self, *data):
+        self.cursor.execute('INSERT OR REPLACE INTO data VALUES (1, ?, ?, ?);', data)
+        # self.cursor.execute('INSERT OR REPLACE INTO data(id, ' + column + ') VALUES(1, "' + data + '");')
         self.connect.commit()
 
     def read_data(self, data):
         self.cursor.execute('SELECT ' + data + ' FROM data WHERE id=1;')
         result = self.cursor.fetchone()
-        return result[0]
+        if result is None:
+            return None
+        else:
+            return result[0]
 
 
 class Config:
@@ -42,29 +47,59 @@ class LadaOnline:
     def __init__(self, host="https://лада.онлайн/", url="auto-news/lada-vesta-news/"):
         self.host = host
         self.url = url
-        self.response = requests.get(host+url)
+        self.response = requests.get(host + url)
         self.soup = BeautifulSoup(self.response.text, 'lxml')
         self.news = self.soup.find(id="dle-content")
+        self.dbase = DB()
 
-    def headers(self):
+    def __headers(self):
         result = self.news.find('h3').text
         return result
 
-    def content(self):
+    def __content(self):
         c = self.news.find_all('td')
         result = c[1].text.replace('Подробнее', '')
         return result
 
-    def image(self):
+    def __image(self):
         images = self.news.find_all('img')
         image_src = images[0]['src']
         s = image_src[image_src.find("=") + 1:]
         result = '&w'.join(s.split('&w')[:-1])
         return result
 
-    def news_url(self):
+    def __news_url(self):
         news_url = self.news.find_all('a')
         result = news_url[0]['href']
+        return result
+
+    def __msg(self):
+        title = self.__headers()
+        last_wrote_title = self.dbase.read_data('last_news')
+        if last_wrote_title is None or title != last_wrote_title:
+            content = self.__content()
+            url = self.__headers()
+            self.dbase.update_data(title, content, url)
+        else:
+            content = self.dbase.read_data('content')
+            title = last_wrote_title
+        result = r'*Новость c сайта лада.онлайн*' + '\n' + '*' + title + '*' + '\n' + content
+        return result
+
+    def __fresh(self):
+        title = self.__headers()
+        last_wrote_title = self.dbase.read_data('last_news')
+        if title != last_wrote_title:
+            return True
+        else:
+            return False
+
+    def data(self):
+        fresh = self.__fresh()
+        msg = self.__msg()
+        url = self.__news_url()
+        img = self.__image()
+        result = {'msg': msg, 'url': url, 'img': img, 'fresh': fresh}
         return result
 
 
@@ -80,20 +115,17 @@ dp = Dispatcher(bot)
 
 
 async def checknews():
-    c = LadaOnline()
-    title = c.headers()
     conf = Config()
-    data = DB()
     chat_id = conf.get_config_value('chat_id')
-    last_wrote_title = data.read_data('last_news')
-    if title != last_wrote_title:
-        msg = r'*Новость c сайта лада.онлайн*' + '\n' + '*' + c.headers() + '*' + '\n' + c.content()
-        inline_btn_1 = InlineKeyboardButton('Подробнее', c.news_url())
-        inline_kb1 = InlineKeyboardMarkup().add(inline_btn_1)
+    c = LadaOnline()
+    data = c.data()
+    inline_btn_1 = InlineKeyboardButton('Подробнее', data['url'])
+    inline_kb1 = InlineKeyboardMarkup().add(inline_btn_1)
+
+    if data['fresh'] is True:
         # 1001365037048
-        await bot.send_photo(chat_id, types.InputFile.from_url(c.image()), msg, parse_mode="MARKDOWN",
+        await bot.send_photo(chat_id, types.InputFile.from_url(data['img']), data['msg'], parse_mode="MARKDOWN",
                              reply_markup=inline_kb1)
-        data.update_data('last_news', title)
 
 
 async def scheduled(wait_for):
@@ -126,17 +158,18 @@ async def send_welcome(message: types.Message):
     This handler will be called when user sends `/start` or `/help` command
     """
     c = LadaOnline()
-    msg = r'*Новость c сайта лада.онлайн*' + '\n' + '*' + c.headers() + '*' + '\n' + c.content()
-    inline_btn_1 = InlineKeyboardButton('Подробнее', c.news_url())
+    data = c.data()
+    inline_btn_1 = InlineKeyboardButton('Подробнее', data['url'])
     inline_kb1 = InlineKeyboardMarkup().add(inline_btn_1)
     # '250484890'
-    await bot.send_photo(message.from_user.id, types.InputFile.from_url(c.image()), msg, parse_mode="MARKDOWN",
+    await bot.send_photo(message.from_user.id, types.InputFile.from_url(data['img']), data['msg'],
+                         parse_mode="MARKDOWN",
                          reply_markup=inline_kb1)
 
 
 if __name__ == '__main__':
-    db = DB()
-    db.install_tables()
+    data_base = DB()
+    data_base.install_tables()
     loop = asyncio.get_event_loop()
-    loop.create_task(scheduled(1800))
+    loop.create_task(scheduled(15))
     executor.start_polling(dp, skip_updates=True)
