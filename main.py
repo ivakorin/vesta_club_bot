@@ -5,8 +5,9 @@ import sqlite3
 import requests
 import yaml
 from aiogram import Bot, Dispatcher, executor, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, User
 from bs4 import BeautifulSoup
+import logging
 
 
 class DB:
@@ -103,15 +104,35 @@ class LadaOnline:
         return result
 
 
+class VK:
+    def __init__(self):
+        t = Config()
+        self.token = str(t.get_config_value('vk_token'))
+        self.group = str(t.get_config_value('vk_group_id'))
+        self.topic = str(t.get_config_value('vk_topic_id'))
+
+    def getrules(self):
+        r = 'https://api.vk.com/method/board.getComments?group_id=' + self.group + '&topic_id=' + self.topic + '&need_likes=0&count=2' \
+                                                                                                               '&extended=1&access_token=' + self.token + '&v=5.130 '
+        respond = requests.get(r).json()
+        result = respond['response']["items"][0]["text"]
+        return result
+
+    def link_to_rules(self):
+        url = 'https://vk.com/topic'
+        result = url + '-' + self.group + '_' + self.topic
+        return result
+
+
 # Test bot token 1558121095:AAHO71rediKKdjqPe9jsveSmrkEfPMJBLW8
 # Prod bot token 1665950041:AAGBfPUmXZXShhG8vY7_NmtVi4m6eCyU-J0
 t = Config()
 token = t.get_config_value('token')
+update_time = t.get_config_value('update_time')
 bot = Bot(token=token)
 dp = Dispatcher(bot)
 
-
-# logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
 
 
 async def checknews():
@@ -152,6 +173,16 @@ async def send_welcome(message: types.Message):
     await message.reply("Бот не доступен для общего пользования")
 
 
+@dp.message_handler(commands=['rules'])
+async def send_welcome(message: types.Message):
+    vk = VK()
+    rules = vk.getrules()
+    link_to_rules = vk.link_to_rules()
+    user = message.from_user.first_name
+    msg = rules+'\nСсылка: '+link_to_rules
+    await message.reply (msg)
+
+
 @dp.message_handler(commands=['news'])
 async def send_welcome(message: types.Message):
     """
@@ -167,9 +198,26 @@ async def send_welcome(message: types.Message):
                          reply_markup=inline_kb1)
 
 
+@dp.message_handler(content_types=["new_chat_members"])
+async def newuser(message: types.Message):
+    vk = VK()
+    link_to_rules = vk.link_to_rules()
+    user = message.new_chat_members[0].first_name
+    msg = 'Привет, ' + user + '!\nМы рады преветствовать тебя в нашем чате!\nНо прежде чем начать общение, пожалуйста ' \
+                              'ознакомься с правилами вызвав команду /rules или можешь почитать их по ссылке:' + \
+          link_to_rules + '\nПриятного общения! '
+    await message.reply(msg)
+
+
+@dp.message_handler(content_types=["left_chat_member"])
+async def leftuser(message: types.Message):
+    await bot.send_message(
+        message.chat.id, 'Теряем бойцов, капитан!')
+
+
 if __name__ == '__main__':
     data_base = DB()
     data_base.install_tables()
     loop = asyncio.get_event_loop()
-    loop.create_task(scheduled(15))
+    loop.create_task(scheduled(update_time))
     executor.start_polling(dp, skip_updates=True)
