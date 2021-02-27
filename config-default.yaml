@@ -1,3 +1,7 @@
 config:
-  token: put_token_here
-  chat_id: put_chat_id_here
+  token:
+  chat_id:
+  update_time:
+  vk_token:
+  vk_group_id:
+  vk_topic_id:
