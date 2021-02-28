@@ -179,8 +179,6 @@ class VK:
             return result
 
 
-# Test bot token 1558121095:AAHO71rediKKdjqPe9jsveSmrkEfPMJBLW8
-# Prod bot token 1665950041:AAGBfPUmXZXShhG8vY7_NmtVi4m6eCyU-J0
 t = Config()
 token = t.get_config_value('token')
 update_time = t.get_config_value('update_time')
