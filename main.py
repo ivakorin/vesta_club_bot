@@ -1,15 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import asyncio
+import logging
 import sqlite3
+import string
+from os import path
 
 import requests
 import yaml
 from aiogram import Bot, Dispatcher, executor, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, User
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from bs4 import BeautifulSoup
-import logging
-from os import path
 
 basedir = path.abspath(path.dirname(__file__))
 
@@ -150,7 +151,7 @@ class VK:
         result = {}
         i = 0
         for k in respond['response']['items']:
-            if k['post_type'] == 'post':
+            if k['post_type'] == 'post' and k['text'] != '':
                 r = db.read_posts('post_id', 'wall_posts', k['id'])
                 if r is None:
                     try:
@@ -187,7 +188,7 @@ bot = Bot(token=token)
 dp = Dispatcher(bot)
 
 
-# logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG)
 
 
 async def checknews():
@@ -204,7 +205,7 @@ async def checknews():
         inline_btn_1 = InlineKeyboardButton('Подробнее', data['url'])
         inline_kb1 = InlineKeyboardMarkup().add(inline_btn_1)
         await bot.send_photo(chat_id, types.InputFile.from_url(data['img']), data['msg'], parse_mode="MARKDOWN",
-                            reply_markup=inline_kb1)
+                             reply_markup=inline_kb1)
     elif wall is not False:
         for k in wall:
             msg = 'Новая запись на стене сообщества <b>' + wall[k]['group_name'] + '</b>\nОт: <a href="https://vk.com/' \
@@ -280,6 +281,16 @@ async def newuser(message: types.Message):
 async def leftuser(message: types.Message):
     await bot.send_message(
         message.chat.id, 'Теряем бойцов, капитан!')
+
+
+@dp.message_handler(content_types=['text'])
+async def reply(message: types.Message):
+    text = message.text.lower()
+    ntext = text.translate(str.maketrans('', '', string.punctuation)).lower()
+    arr = ntext.split()
+    if 'масло' and 'какое' or 'какие' and 'свечи' or 'какой' and 'бензин' in arr:
+        with open(path.join(basedir, 'img/shitstorm.jpg'), 'rb') as photo:
+            await message.reply_photo(photo)
 
 
 if __name__ == '__main__':
