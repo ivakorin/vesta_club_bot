@@ -116,7 +116,8 @@ class VK:
 
     def getrules(self):
         r = 'https://api.vk.com/method/board.getComments?group_id=' + self.group + '&topic_id=' + self.topic + \
-            '&need_likes=0&count=2 &extended=1&access_token=' + self.token + '&v=5.130 '
+            '&need_likes=0&count=2&extended=1&access_token=' + self.token + '&v=5.130 '
+        print(r)
         respond = requests.get(r).json()
         result = respond['response']["items"][0]["text"]
         return result
