@@ -135,7 +135,7 @@ update_time = t.get_config_value('update_time')
 bot = Bot(token=token)
 dp = Dispatcher(bot)
 
-logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG)
 
 
 async def checknews():
