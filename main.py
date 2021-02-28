@@ -13,23 +13,37 @@ from os import path
 
 basedir = path.abspath(path.dirname(__file__))
 
+
 class DB:
     def __init__(self, db_name=path.join(basedir, 'data.db')):
         self.connect = sqlite3.connect(db_name)
         self.cursor = self.connect.cursor()
 
     def install_tables(self):
-        self.cursor.execute('CREATE TABLE IF NOT EXISTS data(id INT PRIMARY KEY DEFAULT 1, last_news TEXT, content '
-                            'TEXT, url TEXT);')
+        self.cursor.executescript('''
+        CREATE TABLE IF NOT EXISTS data(id INTEGER PRIMARY KEY DEFAULT 1, last_news TEXT, content TEXT, url TEXT);
+        CREATE TABLE IF NOT EXISTS wall_posts(id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, post_id INTEGER);
+        ''')
         self.connect.commit()
 
     def update_data(self, *data):
         self.cursor.execute('INSERT OR REPLACE INTO data VALUES (1, ?, ?, ?);', data)
-        # self.cursor.execute('INSERT OR REPLACE INTO data(id, ' + column + ') VALUES(1, "' + data + '");')
         self.connect.commit()
 
-    def read_data(self, data):
-        self.cursor.execute('SELECT ' + data + ' FROM data WHERE id=1;')
+    def read_data(self, data, table, id):
+        self.cursor.execute('SELECT ' + data + ' FROM ' + table + ' WHERE id=' + str(id) + ';')
+        result = self.cursor.fetchone()
+        if result is None:
+            return None
+        else:
+            return result[0]
+
+    def write_post(self, post_id):
+        self.cursor.execute('INSERT INTO wall_posts(post_id) VALUES(' + str(post_id) + ');')
+        self.connect.commit()
+
+    def read_posts(self, data, table, id):
+        self.cursor.execute('SELECT ' + data + ' FROM ' + table + ' WHERE post_id=' + str(id) + ';')
         result = self.cursor.fetchone()
         if result is None:
             return None
@@ -79,20 +93,20 @@ class LadaOnline:
 
     def __msg(self):
         title = self.__headers()
-        last_wrote_title = self.dbase.read_data('last_news')
+        last_wrote_title = self.dbase.read_data('last_news', 'data', 1)
         if last_wrote_title is None or title != last_wrote_title:
             content = self.__content()
             url = self.__headers()
             self.dbase.update_data(title, content, url)
         else:
-            content = self.dbase.read_data('content')
+            content = self.dbase.read_data('content', 'data', 1)
             title = last_wrote_title
         result = r'*Новость c сайта лада.онлайн*' + '\n' + '*' + title + '*' + '\n' + content
         return result
 
     def __fresh(self):
         title = self.__headers()
-        last_wrote_title = self.dbase.read_data('last_news')
+        last_wrote_title = self.dbase.read_data('last_news', 'data', 1)
         if title != last_wrote_title:
             return True
         else:
@@ -114,10 +128,10 @@ class VK:
         self.group = str(t.get_config_value('vk_group_id'))
         self.topic = str(t.get_config_value('vk_topic_id'))
 
-    def getrules(self):
-        r = 'https://api.vk.com/method/board.getComments?group_id=' + self.group + '&topic_id=' + self.topic + \
-            '&need_likes=0&count=2&extended=1&access_token=' + self.token + '&v=5.130 '
-        print(r)
+    def get_rules(self):
+        vk_method = 'board.getComments'
+        r = 'https://api.vk.com/method/' + vk_method + '?access_token=' + self.token + '&group_id=' + self.group + \
+            '&topic_id=' + self.topic + '&need_likes=0&count=2&extended=1&v=5.130'
         respond = requests.get(r).json()
         result = respond['response']["items"][0]["text"]
         return result
@@ -126,6 +140,32 @@ class VK:
         url = 'https://vk.com/topic'
         result = url + '-' + self.group + '_' + self.topic
         return result
+
+    def last_wall_posts(self):
+        db = DB()
+        vk_method = 'wall.get'
+        r = 'https://api.vk.com/method/' + vk_method + '?access_token=' + self.token + '&owner_id=-' + self.group + \
+            '&count=2&extended=1&v=5.130&lang=ru'
+        respond = requests.get(r).json()
+        result = {}
+        i = 0
+        for k in respond['response']['items']:
+            if k['post_type'] == 'post':
+                r = db.read_posts('post_id', 'wall_posts', k['id'])
+                if r is None:
+                    result[i] = {'post_id': k['id'], 'post_text': k['text'],
+                                 'user_id': respond['response']['profiles'][i]['screen_name'],
+                                 'user_fn': respond['response']['profiles'][i]['first_name'],
+                                 'user_ln': respond['response']['profiles'][i]['last_name'],
+                                 'group_name': respond['response']['groups'][0]['name'],
+                                 'group_screen_name': respond['response']['groups'][0]['screen_name'],
+                                 'group_id': respond['response']['groups'][0]['id']}
+                    db.write_post(k['id'])
+            i += 1
+        if len(result) == 0:
+            return False
+        else:
+            return result
 
 
 # Test bot token 1558121095:AAHO71rediKKdjqPe9jsveSmrkEfPMJBLW8
@@ -136,7 +176,8 @@ update_time = t.get_config_value('update_time')
 bot = Bot(token=token)
 dp = Dispatcher(bot)
 
-#logging.basicConfig(level=logging.DEBUG)
+
+# logging.basicConfig(level=logging.DEBUG)
 
 
 async def checknews():
@@ -144,13 +185,26 @@ async def checknews():
     chat_id = conf.get_config_value('chat_id')
     c = LadaOnline()
     data = c.data()
-    inline_btn_1 = InlineKeyboardButton('Подробнее', data['url'])
-    inline_kb1 = InlineKeyboardMarkup().add(inline_btn_1)
+
+    vk = VK()
+    wall = vk.last_wall_posts()
 
     if data['fresh'] is True:
         # 1001365037048
+        inline_btn_1 = InlineKeyboardButton('Подробнее', data['url'])
+        inline_kb1 = InlineKeyboardMarkup().add(inline_btn_1)
         await bot.send_photo(chat_id, types.InputFile.from_url(data['img']), data['msg'], parse_mode="MARKDOWN",
-                             reply_markup=inline_kb1)
+                            reply_markup=inline_kb1)
+    elif wall is not False:
+        for k in wall:
+            msg = 'Новая запись на стене сообщества <b>' + wall[k]['group_name'] + '</b>\nОт <a href="https://vk.com/' \
+                  + wall[k]['user_id'] + '"> ' + wall[k]['user_fn'] + ' ' + wall[k]['user_ln'] + '</a>\nЗапись:\n' + \
+                  wall[k]['post_text']
+            url = 'https://vk.com/' + wall[k]['group_screen_name'] + '?w=wall-' + str(wall[k]['group_id']) + '_' \
+                  + str(wall[k]['post_id'])
+            inline_btn_1 = InlineKeyboardButton('Подробнее', url)
+            inline_kb1 = InlineKeyboardMarkup().add(inline_btn_1)
+            await bot.send_message(chat_id, msg, parse_mode='HTML', reply_markup=inline_kb1)
 
 
 async def scheduled(wait_for):
@@ -180,10 +234,10 @@ async def send_welcome(message: types.Message):
 @dp.message_handler(commands=['rules'])
 async def send_welcome(message: types.Message):
     vk = VK()
-    rules = vk.getrules()
+    rules = vk.get_rules()
     link_to_rules = vk.link_to_rules()
-    msg = rules + '\nСсылка: ' + link_to_rules
-    await message.reply(msg)
+    msg = rules + '\nСсылка: <a href="' + link_to_rules + '">Правила группы</a>'
+    await message.reply(msg, parse_mode='HTML')
 
 
 @dp.message_handler(commands=['news'])
@@ -206,10 +260,10 @@ async def newuser(message: types.Message):
     vk = VK()
     link_to_rules = vk.link_to_rules()
     user = message.new_chat_members[0].first_name
-    msg = 'Привет, ' + user + '!\nМы рады преветствовать тебя в нашем чате!\nНо прежде чем начать общение, пожалуйста ' \
-                              'ознакомься с правилами вызвав команду /rules или можешь почитать их по ссылке:' + \
-          link_to_rules + '\nПриятного общения! '
-    await message.reply(msg)
+    msg = 'Привет, ' + user + '!\nМы рады преветствовать тебя в нашем чате!\nНо прежде чем начать общение, ' \
+                              'пожалуйста ознакомься с правилами вызвав команду <b>/rules</b> или можешь почитать ' \
+                              'их Вконтакте: <a href="' + link_to_rules + '">Правила группы</a>\nПриятного общения! '
+    await message.reply(msg, parse_mode='HTML')
 
 
 @dp.message_handler(content_types=["left_chat_member"])
