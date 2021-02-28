@@ -9,10 +9,12 @@ from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, User
 from bs4 import BeautifulSoup
 import logging
+from os import path
 
+basedir = path.abspath(path.dirname(__file__))
 
 class DB:
-    def __init__(self, db_name='data.db'):
+    def __init__(self, db_name=path.join(basedir, 'data.db')):
         self.connect = sqlite3.connect(db_name)
         self.cursor = self.connect.cursor()
 
@@ -37,8 +39,8 @@ class DB:
 
 class Config:
     def __init__(self):
-        self.config = yaml.load(open('config.yaml'), Loader=yaml.Loader)
-        self.config_location = 'config.yaml'
+        self.config = yaml.load(open(path.join(basedir, 'config.yaml')), Loader=yaml.Loader)
+        self.config_location = path.join(basedir, 'config.yaml')
 
     def get_config_value(self, value):
         result = self.config['config'][str(value)]
@@ -113,8 +115,8 @@ class VK:
         self.topic = str(t.get_config_value('vk_topic_id'))
 
     def getrules(self):
-        r = 'https://api.vk.com/method/board.getComments?group_id=' + self.group + '&topic_id=' + self.topic + '&need_likes=0&count=2' \
-                                                                                                               '&extended=1&access_token=' + self.token + '&v=5.130 '
+        r = 'https://api.vk.com/method/board.getComments?group_id=' + self.group + '&topic_id=' + self.topic + \
+            '&need_likes=0&count=2 &extended=1&access_token=' + self.token + '&v=5.130 '
         respond = requests.get(r).json()
         result = respond['response']["items"][0]["text"]
         return result
@@ -179,9 +181,8 @@ async def send_welcome(message: types.Message):
     vk = VK()
     rules = vk.getrules()
     link_to_rules = vk.link_to_rules()
-    user = message.from_user.first_name
-    msg = rules+'\nСсылка: '+link_to_rules
-    await message.reply (msg)
+    msg = rules + '\nСсылка: ' + link_to_rules
+    await message.reply(msg)
 
 
 @dp.message_handler(commands=['news'])
