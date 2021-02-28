@@ -153,14 +153,24 @@ class VK:
             if k['post_type'] == 'post':
                 r = db.read_posts('post_id', 'wall_posts', k['id'])
                 if r is None:
-                    result[i] = {'post_id': k['id'], 'post_text': k['text'],
-                                 'user_id': respond['response']['profiles'][i]['screen_name'],
-                                 'user_fn': respond['response']['profiles'][i]['first_name'],
-                                 'user_ln': respond['response']['profiles'][i]['last_name'],
-                                 'group_name': respond['response']['groups'][0]['name'],
-                                 'group_screen_name': respond['response']['groups'][0]['screen_name'],
-                                 'group_id': respond['response']['groups'][0]['id']}
+                    try:
+                        result[i] = {'post_id': k['id'], 'post_text': k['text'],
+                                     'user_id': respond['response']['profiles'][i]['screen_name'],
+                                     'user_fn': respond['response']['profiles'][i]['first_name'],
+                                     'user_ln': respond['response']['profiles'][i]['last_name'],
+                                     'group_name': respond['response']['groups'][0]['name'],
+                                     'group_screen_name': respond['response']['groups'][0]['screen_name'],
+                                     'group_id': respond['response']['groups'][0]['id']}
+                    except IndexError:
+                        result[i] = {'post_id': k['id'], 'post_text': k['text'],
+                                     'user_id': respond['response']['groups'][0]['screen_name'],
+                                     'user_fn': respond['response']['groups'][0]['name'],
+                                     'user_ln': '',
+                                     'group_name': respond['response']['groups'][0]['name'],
+                                     'group_screen_name': respond['response']['groups'][0]['screen_name'],
+                                     'group_id': respond['response']['groups'][0]['id']}
                     db.write_post(k['id'])
+
             i += 1
         if len(result) == 0:
             return False
@@ -197,7 +207,7 @@ async def checknews():
                             reply_markup=inline_kb1)
     elif wall is not False:
         for k in wall:
-            msg = 'Новая запись на стене сообщества <b>' + wall[k]['group_name'] + '</b>\nОт <a href="https://vk.com/' \
+            msg = 'Новая запись на стене сообщества <b>' + wall[k]['group_name'] + '</b>\nОт: <a href="https://vk.com/' \
                   + wall[k]['user_id'] + '"> ' + wall[k]['user_fn'] + ' ' + wall[k]['user_ln'] + '</a>\nЗапись:\n' + \
                   wall[k]['post_text']
             url = 'https://vk.com/' + wall[k]['group_screen_name'] + '?w=wall-' + str(wall[k]['group_id']) + '_' \
