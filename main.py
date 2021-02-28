@@ -288,7 +288,7 @@ async def reply(message: types.Message):
     text = message.text.lower()
     ntext = text.translate(str.maketrans('', '', string.punctuation)).lower()
     arr = ntext.split()
-    if 'масло' and 'какое' in arr or 'свечи' and 'какие' in arr or 'бензин' and 'какой' in arr:
+    if 'масло' in arr and 'какое' in arr or 'свечи' in arr and 'какие' in arr or 'бензин' in arr and 'какой' in arr:
         with open(path.join(basedir, 'img/shitstorm.jpg'), 'rb') as photo:
             await message.reply_photo(photo)
 
