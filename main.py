@@ -186,7 +186,7 @@ bot = Bot(token=token)
 dp = Dispatcher(bot)
 
 
-#logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 async def checknews():
