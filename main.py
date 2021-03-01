@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import asyncio
 import logging
+import logging.config
 import sqlite3
 import string
 from os import path
@@ -170,7 +171,6 @@ class VK:
                                      'group_name': respond['response']['groups'][0]['name'],
                                      'group_screen_name': respond['response']['groups'][0]['screen_name'],
                                      'group_id': respond['response']['groups'][0]['id']}
-                    db.write_post(k['id'])
 
             i += 1
         if len(result) == 0:
@@ -184,8 +184,6 @@ token = t.get_config_value('token')
 update_time = t.get_config_value('update_time')
 bot = Bot(token=token)
 dp = Dispatcher(bot)
-
-
 logging.basicConfig(level=logging.INFO)
 
 
@@ -197,6 +195,8 @@ async def checknews():
 
     vk = VK()
     wall = vk.last_wall_posts()
+
+    db = DB()
 
     if data['fresh'] is True:
         # 1001365037048
@@ -214,6 +214,7 @@ async def checknews():
             inline_btn_1 = InlineKeyboardButton('Подробнее', url)
             inline_kb1 = InlineKeyboardMarkup().add(inline_btn_1)
             await bot.send_message(chat_id, msg, parse_mode='HTML', reply_markup=inline_kb1)
+            db.write_post(wall[k]['post_id'])
 
 
 async def scheduled(wait_for):
