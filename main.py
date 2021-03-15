@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 import asyncio
 import logging
-import logging.config
 import sqlite3
 import string
 from os import path
@@ -16,15 +15,19 @@ from bs4 import BeautifulSoup
 basedir = path.abspath(path.dirname(__file__))
 
 
+# logging.basicConfig(level=logging.DEBUG)
+
+
 class DB:
     def __init__(self, db_name=path.join(basedir, 'data.db')):
         self.connect = sqlite3.connect(db_name)
         self.cursor = self.connect.cursor()
 
     def install_tables(self):
-        self.cursor.executescript('''
-        CREATE TABLE IF NOT EXISTS data(id INTEGER PRIMARY KEY DEFAULT 1, last_news TEXT, content TEXT, url TEXT);
-        CREATE TABLE IF NOT EXISTS wall_posts(id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, post_id INTEGER);
+        self.cursor.executescript('''CREATE TABLE IF NOT EXISTS data(id INTEGER PRIMARY KEY DEFAULT 1, last_news 
+        TEXT, content TEXT, url TEXT); CREATE TABLE IF NOT EXISTS wall_posts(id INTEGER PRIMARY KEY AUTOINCREMENT NOT 
+        NULL, post_id INTEGER); CREATE TABLE IF NOT EXISTS rules_requests(id INTEGER PRIMARY KEY AUTOINCREMENT NOT 
+        NULL, last_post_date INTEGER, last_r_user_id INTEGER, message_id, INTEGER);
         ''')
         self.connect.commit()
 
@@ -51,6 +54,17 @@ class DB:
             return None
         else:
             return result[0]
+
+    def write_rules_request_data(self, data):
+        self.cursor.execute('INSERT OR REPLACE INTO rules_requests VALUES (1, ?, ?, ?);', data)
+        self.connect.commit()
+
+    def read_rules_request_data(self, data):
+        self.cursor.execute('SELECT ' + str(data) + ' FROM rules_requests;')
+        result = self.cursor.fetchone()
+        if result is None:
+            return None
+        return result[0]
 
 
 class Config:
@@ -155,22 +169,10 @@ class VK:
             if k['post_type'] == 'post' and k['text'] != '':
                 r = db.read_posts('post_id', 'wall_posts', k['id'])
                 if r is None:
-                    try:
-                        result[i] = {'post_id': k['id'], 'post_text': k['text'],
-                                     'user_id': respond['response']['profiles'][i]['screen_name'],
-                                     'user_fn': respond['response']['profiles'][i]['first_name'],
-                                     'user_ln': respond['response']['profiles'][i]['last_name'],
-                                     'group_name': respond['response']['groups'][0]['name'],
-                                     'group_screen_name': respond['response']['groups'][0]['screen_name'],
-                                     'group_id': respond['response']['groups'][0]['id']}
-                    except IndexError:
-                        result[i] = {'post_id': k['id'], 'post_text': k['text'],
-                                     'user_id': respond['response']['groups'][0]['screen_name'],
-                                     'user_fn': respond['response']['groups'][0]['name'],
-                                     'user_ln': '',
-                                     'group_name': respond['response']['groups'][0]['name'],
-                                     'group_screen_name': respond['response']['groups'][0]['screen_name'],
-                                     'group_id': respond['response']['groups'][0]['id']}
+                    result[i] = {'post_id': k['id'], 'post_text': k['text'],
+                                 'group_name': respond['response']['groups'][0]['name'],
+                                 'group_screen_name': respond['response']['groups'][0]['screen_name'],
+                                 'group_id': respond['response']['groups'][0]['id']}
 
             i += 1
         if len(result) == 0:
@@ -206,9 +208,9 @@ async def checknews():
                              reply_markup=inline_kb1)
     elif wall is not False:
         for k in wall:
-            msg = 'Новая запись на стене сообщества <b>' + wall[k]['group_name'] + '</b>\nОт: <a href="https://vk.com/' \
-                  + wall[k]['user_id'] + '"> ' + wall[k]['user_fn'] + ' ' + wall[k]['user_ln'] + '</a>\nЗапись:\n' + \
-                  wall[k]['post_text']
+            msg = 'Новая запись на стене сообщества <b>' + wall[k]['group_name'] + '</b>\n' \
+                                                                                   '<b>Запись:</b>\n' + wall[k][
+                      'post_text']
             url = 'https://vk.com/' + wall[k]['group_screen_name'] + '?w=wall-' + str(wall[k]['group_id']) + '_' \
                   + str(wall[k]['post_id'])
             inline_btn_1 = InlineKeyboardButton('Подробнее', url)
@@ -243,11 +245,31 @@ async def send_welcome(message: types.Message):
 
 @dp.message_handler(commands=['rules'])
 async def send_welcome(message: types.Message):
-    vk = VK()
-    rules = vk.get_rules()
-    link_to_rules = vk.link_to_rules()
-    msg = rules + '\nСсылка: <a href="' + link_to_rules + '">Правила группы</a>'
-    await message.reply(msg, parse_mode='HTML')
+    conf = Config()
+    chat_id = conf.get_config_value('chat_id')
+    db = DB()
+    last_req = db.read_rules_request_data('last_post_date')
+    if last_req is None:
+        last_req = 0
+    date = message.date.timestamp()
+    t_comp = date - last_req
+    if int(t_comp) > 1800 or message.chat.id != chat_id:
+        vk = VK()
+        rules = vk.get_rules()
+        link_to_rules = vk.link_to_rules()
+        msg = rules + '\nСсылка: <a href="' + link_to_rules + '">Правила группы</a>'
+        resp = await message.reply(msg, parse_mode='HTML')
+        user_id = message.from_user.id
+        data = (int(date), int(user_id), int(resp))
+        if message.chat.id == chat_id:
+            db.write_rules_request_data(data)
+    else:
+        mes_id = db.read_rules_request_data('message_id')
+        conf = Config()
+        chat_id = conf.get_config_value('chat_id')
+        msg = 'Я отправлял сообщение с правилами в чат менее 30 минут назад, не вижу смысла отправлять ещё раз. ' \
+              'Но я не гордый, поэтому вот вам ссылка на сообщение.'
+        await bot.send_message(chat_id=chat_id, text=msg, reply_to_message_id=mes_id)
 
 
 @dp.message_handler(commands=['news'])
