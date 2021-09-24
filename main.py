@@ -5,6 +5,7 @@ import logging
 import sqlite3
 import string
 from os import path
+import re
 
 import requests
 import yaml
@@ -13,6 +14,8 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from bs4 import BeautifulSoup
 
 basedir = path.abspath(path.dirname(__file__))
+
+from error_codes import ErrorCodes
 
 
 # logging.basicConfig(level=logging.DEBUG)
@@ -312,6 +315,36 @@ async def reply(message: types.Message):
     if 'масло' in arr and 'какое' in arr or 'свечи' in arr and 'какие' in arr or 'бензин' in arr and 'какой' in arr:
         with open(path.join(basedir, 'img/shitstorm.jpg'), 'rb') as photo:
             await message.reply_photo(photo)
+    match = re.findall(r'[Pp]\d{4}', text)
+    match_ru = re.findall(r'[Рр]\d{4}', text)
+    match_u = re.findall(r'[Uu]\d{4}', text)
+
+    if match:
+        ec = match[0].upper()
+        err_code = ErrorCodes(ec)
+        result = err_code.codes_return()
+        msg = 'Пссс, парень, у меня есть информация об этой ошибке, смотри \nОшибка: ' + result[
+            'error_code'] + '\nОписание: ' + result['description'] + '\nУстранение неисправности:\n' + result[
+                  'troubleshooting']
+        await message.reply(msg, parse_mode='HTML')
+    elif match_ru:
+        ec = match_ru[0].upper()
+        ec = ec.replace('Р', 'P')
+        err_code = ErrorCodes(ec)
+        result = err_code.codes_return()
+        msg = 'Пссс, парень, у меня есть информация об этой ошибке, смотри \nОшибка: ' + result[
+            'error_code'] + '\nОписание: ' + result['description'] + '\nУстранение неисправности:\n' + result[
+                  'troubleshooting']
+        await message.reply(msg, parse_mode='HTML')
+    elif match_u:
+        ec = match_ru[0].upper()
+        ec = ec.replace('Р', 'P')
+        err_code = ErrorCodes(ec)
+        result = err_code.codes_return()
+        msg = 'Пссс, парень, у меня есть информация об этой ошибке, смотри \nОшибка: ' + result[
+            'error_code'] + '\nОписание: ' + result['description'] + '\nУстранение неисправности:\n' + result[
+                  'troubleshooting']
+        await message.reply(msg, parse_mode='HTML')
 
 
 if __name__ == '__main__':
