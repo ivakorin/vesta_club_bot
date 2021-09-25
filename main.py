@@ -316,34 +316,23 @@ async def reply(message: types.Message):
         with open(path.join(basedir, 'img/shitstorm.jpg'), 'rb') as photo:
             await message.reply_photo(photo)
     match = re.findall(r'[Pp]\d{4}', text)
-    match_ru = re.findall(r'[Рр]\d{4}', text)
-    match_u = re.findall(r'[Uu]\d{4}', text)
-
+    if not match:
+        match = re.findall(r'[Рр]\d{4}', text)  # На кириллице
+        if match:
+            error_code = match[0].upper()
+            error_code = error_code.replace('Р', 'P')  # Меняем киррилическую Р на латинскую П
+            print(error_code)
+            match[0] = error_code
+        else:
+            match = re.findall(r'[Uu]\d{4}', text)  # U коды
     if match:
         ec = match[0].upper()
         err_code = ErrorCodes(ec)
         result = err_code.codes_return()
-        msg = 'Пссс, парень, у меня есть информация об этой ошибке, смотри \nОшибка: ' + result[
-            'error_code'] + '\nОписание: ' + result['description'] + '\nУстранение неисправности:\n' + result[
-                  'troubleshooting']
-        await message.reply(msg, parse_mode='HTML')
-    elif match_ru:
-        ec = match_ru[0].upper()
-        ec = ec.replace('Р', 'P')
-        err_code = ErrorCodes(ec)
-        result = err_code.codes_return()
-        msg = 'Пссс, парень, у меня есть информация об этой ошибке, смотри \nОшибка: ' + result[
-            'error_code'] + '\nОписание: ' + result['description'] + '\nУстранение неисправности:\n' + result[
-                  'troubleshooting']
-        await message.reply(msg, parse_mode='HTML')
-    elif match_u:
-        ec = match_ru[0].upper()
-        ec = ec.replace('Р', 'P')
-        err_code = ErrorCodes(ec)
-        result = err_code.codes_return()
-        msg = 'Пссс, парень, у меня есть информация об этой ошибке, смотри \nОшибка: ' + result[
-            'error_code'] + '\nОписание: ' + result['description'] + '\nУстранение неисправности:\n' + result[
-                  'troubleshooting']
+        user = message.from_user.first_name
+        msg = 'Пссс, %s, у меня есть информация об этой ошибке, ' \
+              'смотри\n<b>Ошибка:</b> %s\n<b>Описание:</b> %s \n<b>Устранение неисправности:</b>\n%s' % \
+              (user, result['error_code'], result['description'], result['troubleshooting'])
         await message.reply(msg, parse_mode='HTML')
 
 
