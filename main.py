@@ -321,7 +321,6 @@ async def reply(message: types.Message):
         if match:
             error_code = match[0].upper()
             error_code = error_code.replace('Р', 'P')  # Меняем киррилическую Р на латинскую П
-            print(error_code)
             match[0] = error_code
         else:
             match = re.findall(r'[Uu]\d{4}', text)  # U коды
@@ -330,9 +329,11 @@ async def reply(message: types.Message):
         err_code = ErrorCodes(ec)
         result = err_code.codes_return()
         user = message.from_user.first_name
-        msg = 'Пссс, %s, у меня есть информация об этой ошибке, ' \
+        user_id = message.from_user.id
+        user_link = "tg://user?id="+str(user_id)
+        msg = 'Пссс, <a href="%s">%s</a>, у меня есть информация об этой ошибке, ' \
               'смотри\n<b>Ошибка:</b> %s\n<b>Описание:</b> %s \n<b>Устранение неисправности:</b>\n%s' % \
-              (user, result['error_code'], result['description'], result['troubleshooting'])
+              (user_link, user, result['error_code'], result['description'], result['troubleshooting'])
         await message.reply(msg, parse_mode='HTML')
 
 
