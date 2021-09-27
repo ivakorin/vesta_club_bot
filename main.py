@@ -243,7 +243,7 @@ async def send_welcome(message: types.Message):
     """
     This handler will be called when user sends `/start` or `/help` command
     """
-    msg = 'Для получения последней новости с сайта <a href="https://лада.онлайн/">лада.онлайн</a> отправьте команду /news.<br> Для получения информации по ошибке, отправьте код ошибки'
+    msg = 'Для получения последней новости с сайта <a href="https://лада.онлайн/">лада.онлайн</a> отправьте команду /news. Для получения информации по ошибке, отправьте код ошибки'
     await message.reply(msg, parse_mode='HTML')
 
 
