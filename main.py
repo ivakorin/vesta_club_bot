@@ -243,7 +243,8 @@ async def send_welcome(message: types.Message):
     """
     This handler will be called when user sends `/start` or `/help` command
     """
-    await message.reply("Бот не доступен для общего пользования")
+    msg = 'Для получения последней новости с сайта <a href="https://лада.онлайн/">лада.онлайн</a> отправьте команду /news.<br> Для получения информации по ошибке, отправьте код ошибки'
+    await message.reply(msg, parse_mode='HTML')
 
 
 @dp.message_handler(commands=['rules'])
