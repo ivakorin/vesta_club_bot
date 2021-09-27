@@ -329,13 +329,14 @@ async def reply(message: types.Message):
         ec = match[0].upper()
         err_code = ErrorCodes(ec)
         result = err_code.codes_return()
-        user = message.from_user.first_name
-        user_id = message.from_user.id
-        user_link = "tg://user?id="+str(user_id)
-        msg = 'Пссс, <a href="%s">%s</a>, у меня есть информация об этой ошибке, ' \
-              'смотри\n<b>Ошибка:</b> %s\n<b>Описание:</b> %s \n<b>Устранение неисправности:</b>\n%s' % \
-              (user_link, user, result['error_code'], result['description'], result['troubleshooting'])
-        await message.reply(msg, parse_mode='HTML')
+        if result:
+            user = message.from_user.first_name
+            user_id = message.from_user.id
+            user_link = "tg://user?id="+str(user_id)
+            msg = 'Пссс, <a href="%s">%s</a>, у меня есть информация об этой ошибке, ' \
+                  'смотри\n<b>Ошибка:</b> %s\n<b>Описание:</b> %s \n<b>Устранение неисправности:</b>\n%s' % \
+                  (user_link, user, result['error_code'], result['description'], result['troubleshooting'])
+            await message.reply(msg, parse_mode='HTML')
 
 
 if __name__ == '__main__':

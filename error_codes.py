@@ -12,10 +12,13 @@ class ErrorCodes:
     def __read_codes(self):
         self.config = yaml.load(open(path.join(basedir, self.list)), Loader=yaml.Loader)
         self.config_location = path.join(basedir, self.list)
-        result = self.config[self.err_code]
+        result = self.config.get(self.err_code)
         return result
 
     def codes_return(self):
         result = self.__read_codes()
-        result['error_code'] = self.err_code
-        return result
+        if result:
+            result['error_code'] = self.err_code
+            return result
+        else:
+            return None
