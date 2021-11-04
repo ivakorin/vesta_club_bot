@@ -1,7 +1,7 @@
 config:
-  token:
-  chat_id:
-  update_time:
-  vk_token:
-  vk_group_id:
-  vk_topic_id:
+  token: telegram_bot_token
+  chat_id: telegram_chat_id
+  update_time: time_delay_for_news_and_vk_updates_check
+  vk_token: vkontakte_token
+  vk_group_id: vkontakte_group_id
+  vk_topic_id: vkontakte_topic_id
